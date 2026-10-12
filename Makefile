@@ -1,17 +1,11 @@
-ARCHS = arm64 arm64e
-TARGET = iphone:clang:16.5:16.0
-THEOS_PACKAGE_SCHEME = roothide
-INSTALL_TARGET_PROCESSES = SpringBoard
-
 include $(THEOS)/makefiles/common.mk
 
-TWEAK_NAME = HotspotAutoOff
-HotspotAutoOff_FILES = Sources/Tweak.m Sources/HAOController.m Sources/HAOHotspot.m Sources/HAOPreferences.m Sources/HAOSharing.m
-HotspotAutoOff_CFLAGS = -fobjc-arc -Wall -Wextra
-HotspotAutoOff_FRAMEWORKS = Foundation SystemConfiguration
-HotspotAutoOff_LIBRARIES = substrate
+BUNDLE_NAME = HotspotAutoOffPrefs
+HotspotAutoOffPrefs_FILES = HAOPreferences.m
+HotspotAutoOffPrefs_CFLAGS = -fobjc-arc -Wall -Wextra
+HotspotAutoOffPrefs_FRAMEWORKS = UIKit Foundation
+HotspotAutoOffPrefs_PRIVATE_FRAMEWORKS = Preferences
+HotspotAutoOffPrefs_INSTALL_PATH = /Library/PreferenceBundles
+HotspotAutoOffPrefs_RESOURCE_DIRS = Resources
 
-include $(THEOS_MAKE_PATH)/tweak.mk
-
-SUBPROJECTS += Preferences
-include $(THEOS_MAKE_PATH)/aggregate.mk
+include $(THEOS_MAKE_PATH)/bundle.mk
