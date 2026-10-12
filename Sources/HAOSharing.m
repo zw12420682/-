@@ -1,7 +1,6 @@
 #import "HAOSharing.h"
 #import "HAOLog.h"
 
-#import <SystemConfiguration/SystemConfiguration.h>
 #import <dlfcn.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
@@ -9,23 +8,25 @@
 static CFStringRef const HAOSharingDomain = CFSTR("com.apple.MobileInternetSharing");
 
 // ---------------------------------------------------------------- SCPreferences
-// SCPreferencesSetValue / CommitChanges / ApplyChanges are annotated
-// API_UNAVAILABLE(ios) in the SDK header, but the symbols are still exported by
-// the system. Binding them at runtime keeps the compile clean and lets the call
-// simply be skipped on a build that really lacks them.
-typedef Boolean (*HAOSCPreferencesSetValue)(SCPreferencesRef, CFStringRef, CFPropertyListRef);
-typedef Boolean (*HAOSCPreferencesCommit)(SCPreferencesRef);
-typedef Boolean (*HAOSCPreferencesApply)(SCPreferencesRef);
+// The whole SCPreferences API is annotated API_UNAVAILABLE(ios) in the SDK, yet
+// the sharing daemon still uses that preference domain. Every entry point is
+// therefore bound at runtime through dlsym and skipped when a symbol is absent,
+// so nothing here is referenced at compile time.
+typedef void *(*HAOSCPreferencesCreate)(CFAllocatorRef, CFStringRef, CFStringRef);
+typedef Boolean (*HAOSCPreferencesSetValue)(void *, CFStringRef, CFPropertyListRef);
+typedef Boolean (*HAOSCPreferencesCommit)(void *);
+typedef Boolean (*HAOSCPreferencesApply)(void *);
 
 static BOOL HAOTurnOffViaPreferences(void) {
+    HAOSCPreferencesCreate create = (HAOSCPreferencesCreate)dlsym(RTLD_DEFAULT, "SCPreferencesCreate");
     HAOSCPreferencesSetValue setValue = (HAOSCPreferencesSetValue)dlsym(RTLD_DEFAULT, "SCPreferencesSetValue");
     HAOSCPreferencesCommit commit = (HAOSCPreferencesCommit)dlsym(RTLD_DEFAULT, "SCPreferencesCommitChanges");
     HAOSCPreferencesApply apply = (HAOSCPreferencesApply)dlsym(RTLD_DEFAULT, "SCPreferencesApplyChanges");
-    if (!setValue || !commit || !apply) {
-        HAOLog(@"turnoff/prefs: write symbols unavailable");
+    if (!create || !setValue || !commit || !apply) {
+        HAOLog(@"turnoff/prefs: SCPreferences symbols unavailable");
         return NO;
     }
-    SCPreferencesRef prefs = SCPreferencesCreate(kCFAllocatorDefault, CFSTR("HotspotAutoOff"), HAOSharingDomain);
+    void *prefs = create(kCFAllocatorDefault, CFSTR("HotspotAutoOff"), HAOSharingDomain);
     if (!prefs) {
         HAOLog(@"turnoff/prefs: SCPreferencesCreate failed");
         return NO;
@@ -39,7 +40,7 @@ static BOOL HAOTurnOffViaPreferences(void) {
     wrote |= setValue(prefs, CFSTR("FamilyShare"), kCFBooleanFalse);
     Boolean committed = commit(prefs);
     Boolean applied = apply(prefs);
-    CFRelease(prefs);
+    CFRelease((CFTypeRef)prefs);
     HAOLog(@"turnoff/prefs: set=%d commit=%d apply=%d", wrote, committed, applied);
     return wrote || committed || applied;
 }
