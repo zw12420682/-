@@ -9,9 +9,22 @@
 static CFStringRef const HAOSharingDomain = CFSTR("com.apple.MobileInternetSharing");
 
 // ---------------------------------------------------------------- SCPreferences
-// The sharing daemon owns this preference domain; clearing the shared-host state
-// and committing is the closest documented control point from another process.
+// SCPreferencesSetValue / CommitChanges / ApplyChanges are annotated
+// API_UNAVAILABLE(ios) in the SDK header, but the symbols are still exported by
+// the system. Binding them at runtime keeps the compile clean and lets the call
+// simply be skipped on a build that really lacks them.
+typedef Boolean (*HAOSCPreferencesSetValue)(SCPreferencesRef, CFStringRef, CFPropertyListRef);
+typedef Boolean (*HAOSCPreferencesCommit)(SCPreferencesRef);
+typedef Boolean (*HAOSCPreferencesApply)(SCPreferencesRef);
+
 static BOOL HAOTurnOffViaPreferences(void) {
+    HAOSCPreferencesSetValue setValue = (HAOSCPreferencesSetValue)dlsym(RTLD_DEFAULT, "SCPreferencesSetValue");
+    HAOSCPreferencesCommit commit = (HAOSCPreferencesCommit)dlsym(RTLD_DEFAULT, "SCPreferencesCommitChanges");
+    HAOSCPreferencesApply apply = (HAOSCPreferencesApply)dlsym(RTLD_DEFAULT, "SCPreferencesApplyChanges");
+    if (!setValue || !commit || !apply) {
+        HAOLog(@"turnoff/prefs: write symbols unavailable");
+        return NO;
+    }
     SCPreferencesRef prefs = SCPreferencesCreate(kCFAllocatorDefault, CFSTR("HotspotAutoOff"), HAOSharingDomain);
     if (!prefs) {
         HAOLog(@"turnoff/prefs: SCPreferencesCreate failed");
@@ -20,12 +33,12 @@ static BOOL HAOTurnOffViaPreferences(void) {
     Boolean wrote = false;
     CFArrayRef empty = CFArrayCreate(kCFAllocatorDefault, NULL, 0, &kCFTypeArrayCallBacks);
     if (empty) {
-        wrote |= SCPreferencesSetValue(prefs, CFSTR("Hosts"), empty);
+        wrote |= setValue(prefs, CFSTR("Hosts"), empty);
         CFRelease(empty);
     }
-    wrote |= SCPreferencesSetValue(prefs, CFSTR("FamilyShare"), kCFBooleanFalse);
-    Boolean committed = SCPreferencesCommitChanges(prefs);
-    Boolean applied = SCPreferencesApplyChanges(prefs);
+    wrote |= setValue(prefs, CFSTR("FamilyShare"), kCFBooleanFalse);
+    Boolean committed = commit(prefs);
+    Boolean applied = apply(prefs);
     CFRelease(prefs);
     HAOLog(@"turnoff/prefs: set=%d commit=%d apply=%d", wrote, committed, applied);
     return wrote || committed || applied;
