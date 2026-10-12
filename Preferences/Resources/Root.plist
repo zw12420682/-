@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>items</key>
+	<array>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>HotspotAutoOff</string>
+			<key>footerText</key>
+			<string>Wi-Fi 个人热点开启后，如果连续指定时间内没有任何设备连接，就自动关闭热点。只处理 Wi-Fi 热点；有设备连着时不计时。每 30 秒检测一次。</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>label</key>
+			<string>启用</string>
+			<key>key</key>
+			<string>Enabled</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>local.hotspotautooff</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>label</key>
+			<string>无连接多久后关闭（分钟）</string>
+			<key>key</key>
+			<string>TimeoutMinutes</string>
+			<key>defaults</key>
+			<string>local.hotspotautooff</string>
+			<key>default</key>
+			<integer>5</integer>
+			<key>min</key>
+			<integer>1</integer>
+			<key>max</key>
+			<integer>60</integer>
+			<key>showValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>调试</string>
+			<key>footerText</key>
+			<string>先打开「只记录不关闭」在真机上确认检测是否正常：达到时间只写日志、不真正关闭热点。日志文件：/var/tmp/hotspot-autooff.log。</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>label</key>
+			<string>只记录不关闭</string>
+			<key>key</key>
+			<string>DryRun</string>
+			<key>default</key>
+			<false/>
+			<key>defaults</key>
+			<string>local.hotspotautooff</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSButtonCell</string>
+			<key>label</key>
+			<string>立即检测一次</string>
+			<key>action</key>
+			<string>checkNow</string>
+		</dict>
+	</array>
+</dict>
+</plist>
