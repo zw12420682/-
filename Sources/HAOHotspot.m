@@ -6,11 +6,59 @@
 #include <stddef.h>
 #import <net/if.h>
 #import <net/if_dl.h>
-#import <net/route.h>
 #import <netinet/in.h>
 #include <string.h>
 #import <sys/socket.h>
 #import <sys/sysctl.h>
+#include <sys/types.h>
+
+// The iPhoneOS SDK ships net/if.h and net/if_dl.h but not net/route.h, so the
+// pieces needed to walk the kernel neighbour table are declared here when the
+// system header is unavailable (macOS keeps using the real one).
+#if __has_include(<net/route.h>)
+#import <net/route.h>
+#else
+#ifndef NET_RT_FLAGS
+#define NET_RT_FLAGS 2
+#endif
+#ifndef RTF_LLINFO
+#define RTF_LLINFO 0x400
+#endif
+#ifndef RTAX_GATEWAY
+#define RTAX_GATEWAY 1
+#endif
+#ifndef RTAX_MAX
+#define RTAX_MAX 8
+#endif
+struct rt_metrics {
+    u_int32_t rmx_locks;
+    u_int32_t rmx_mtu;
+    u_int32_t rmx_hopcount;
+    int32_t rmx_expire;
+    u_int32_t rmx_recvpipe;
+    u_int32_t rmx_sendpipe;
+    u_int32_t rmx_ssthresh;
+    u_int32_t rmx_rtt;
+    u_int32_t rmx_rttvar;
+    u_int32_t rmx_pksent;
+    u_int32_t rmx_state;
+    u_int32_t rmx_filler[3];
+};
+struct rt_msghdr {
+    u_short rtm_msglen;
+    u_char rtm_version;
+    u_char rtm_type;
+    u_short rtm_index;
+    int rtm_flags;
+    int rtm_addrs;
+    pid_t rtm_pid;
+    int rtm_seq;
+    int rtm_errno;
+    int rtm_use;
+    u_int32_t rtm_inits;
+    struct rt_metrics rtm_rmx;
+};
+#endif
 
 NSString * const HAOHotspotInterface = @"bridge0";
 
