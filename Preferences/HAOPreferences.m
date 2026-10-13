@@ -26,4 +26,8 @@
     CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),
         CFSTR("local.hotspotautooff/preferences.changed"), NULL, NULL, YES);
 }
+- (void)exportDiagnostics {
+    CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),
+        CFSTR("local.hotspotautooff/diagnostics"), NULL, NULL, YES);
+}
 @end

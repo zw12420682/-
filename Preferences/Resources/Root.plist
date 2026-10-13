@@ -70,6 +70,14 @@
 			<key>action</key>
 			<string>checkNow</string>
 		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSButtonCell</string>
+			<key>label</key>
+			<string>导出诊断信息</string>
+			<key>action</key>
+			<string>exportDiagnostics</string>
+		</dict>
 	</array>
 </dict>
 </plist>

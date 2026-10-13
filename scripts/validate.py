@@ -17,6 +17,8 @@ required = [
     "Sources/HAOSharing.m",
     "Sources/HAOController.h",
     "Sources/HAOController.m",
+    "Sources/HAODiagnostics.h",
+    "Sources/HAODiagnostics.m",
     "Preferences/Makefile",
     "Preferences/HAOPreferences.m",
     "Preferences/Resources/Root.plist",
@@ -42,7 +44,7 @@ assert control["Architecture"] == "iphoneos-arm64e"
 
 makefile = (root / "Makefile").read_text()
 assert "THEOS_PACKAGE_SCHEME = roothide" in makefile, "RootHide packaging scheme is required."
-for source in ["Sources/HAOController.m", "Sources/HAOHotspot.m", "Sources/HAOPreferences.m", "Sources/HAOSharing.m"]:
+for source in ["Sources/HAOController.m", "Sources/HAODiagnostics.m", "Sources/HAOHotspot.m", "Sources/HAOPreferences.m", "Sources/HAOSharing.m"]:
     assert source in makefile, f"Update the Makefile for {source}."
 
 filters = plistlib.loads((root / "HotspotAutoOff.plist").read_bytes())

@@ -4,14 +4,19 @@
 #import "HAOSharing.h"
 #import "HAOLog.h"
 
-// Poll cadence. The idle threshold is measured in minutes, so 30 s is plenty and
-// keeps the ARP scan off the hot path.
-static const NSTimeInterval HAOPollInterval = 30.0;
+// Adaptive cadence: the neighbour scan is only worth running while the hotspot is
+// up. When it is down every check costs a single if_nametoindex syscall, so the
+// timer backs off to once a minute; while up it polls every 30 s. The timer is
+// one-shot and rescheduled, so the cadence can follow the hotspot state, and the
+// tolerance lets the kernel coalesce the wakeup with other timers.
+static const NSTimeInterval HAOPollIntervalActive = 30.0;
+static const NSTimeInterval HAOPollIntervalDormant = 60.0;
 
 @interface HAOController ()
 @property(nonatomic, strong) NSTimer *timer;
 @property(nonatomic) NSTimeInterval idleSince;
 @property(nonatomic) BOOL wasActive;
+@property(nonatomic) BOOL running;
 @end
 
 @implementation HAOController
@@ -24,22 +29,38 @@ static const NSTimeInterval HAOPollInterval = 30.0;
 }
 
 - (void)start {
-    if (self.timer) return;
-    HAOLog(@"monitor: started (poll %.0fs)", HAOPollInterval);
-    self.timer = [NSTimer timerWithTimeInterval:HAOPollInterval repeats:YES
-        block:^(__unused NSTimer *timer) { [[HAOController shared] tick]; }];
-    self.timer.tolerance = 5.0;
-    [NSRunLoop.mainRunLoop addTimer:self.timer forMode:NSRunLoopCommonModes];
+    if (self.running) return;
+    self.running = YES;
+    HAOLog(@"monitor: started (poll %.0fs active / %.0fs dormant)", HAOPollIntervalActive, HAOPollIntervalDormant);
     [self tick];
 }
 
 - (void)stop {
+    self.running = NO;
     [self.timer invalidate];
     self.timer = nil;
     HAOLog(@"monitor: stopped");
 }
 
+- (void)scheduleNext {
+    [self.timer invalidate];
+    self.timer = nil;
+    if (!self.running) return;
+    NSTimeInterval interval = self.wasActive ? HAOPollIntervalActive : HAOPollIntervalDormant;
+    self.timer = [NSTimer timerWithTimeInterval:interval repeats:NO
+        block:^(__unused NSTimer *timer) { [[HAOController shared] tick]; }];
+    self.timer.tolerance = interval * 0.2;
+    [NSRunLoop.mainRunLoop addTimer:self.timer forMode:NSRunLoopCommonModes];
+}
+
 - (void)tick {
+    [self.timer invalidate];
+    self.timer = nil;
+    [self evaluate];
+    [self scheduleNext];
+}
+
+- (void)evaluate {
     if (!HAOEnabled()) {
         if (self.wasActive || self.idleSince) HAOLog(@"state: tweak disabled");
         self.wasActive = NO;
@@ -76,10 +97,7 @@ static const NSTimeInterval HAOPollInterval = 30.0;
     }
     NSTimeInterval idle = now - self.idleSince;
     NSInteger limit = HAOTimeoutMinutes() * 60;
-    if (idle < limit) {
-        HAOLog(@"idle: %.0fs / %lds", idle, (long)limit);
-        return;
-    }
+    if (idle < limit) return;
     self.idleSince = 0;
     if (HAODryRun()) {
         HAOLog(@"action: dry run, would close the hotspot after %.0fs idle", idle);
