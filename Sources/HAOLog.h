@@ -1,16 +1,15 @@
-// Shared diagnostic logger. Writes to NSLog and to the first writable path so the
-// result can be inspected with a file manager instead of a live log viewer.
+// Shared logger. Writes to NSLog and to a single file so the log does not end up
+// duplicated across two paths (which made an earlier report twice as long).
 #pragma once
 #import <Foundation/Foundation.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <unistd.h>
 
-static inline NSArray<NSString *> *HAOLogPaths(void) {
-    static NSArray<NSString *> *paths = nil;
+static inline NSString *HAOLogPath(void) {
+    static NSString *path = nil;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        NSMutableArray<NSString *> *writable = [NSMutableArray array];
         NSArray<NSString *> *candidates = @[
             @"/var/tmp/hotspot-autooff.log",
             @"/var/mobile/Library/Logs/hotspot-autooff.log",
@@ -20,11 +19,11 @@ static inline NSArray<NSString *> *HAOLogPaths(void) {
             FILE *file = fopen(candidate.fileSystemRepresentation, "a");
             if (!file) continue;
             fclose(file);
-            [writable addObject:candidate];
+            path = candidate;
+            break;
         }
-        paths = writable;
     });
-    return paths;
+    return path;
 }
 
 static inline void HAOLog(NSString *format, ...) {
@@ -41,10 +40,10 @@ static inline void HAOLog(NSString *format, ...) {
     });
     NSString *line = [NSString stringWithFormat:@"%@ [pid=%d] %@\n",
                       [formatter stringFromDate:NSDate.date], getpid(), message];
-    for (NSString *path in HAOLogPaths()) {
-        FILE *file = fopen(path.fileSystemRepresentation, "a");
-        if (!file) continue;
-        fputs(line.UTF8String, file);
-        fclose(file);
-    }
+    NSString *path = HAOLogPath();
+    if (!path) return;
+    FILE *file = fopen(path.fileSystemRepresentation, "a");
+    if (!file) return;
+    fputs(line.UTF8String, file);
+    fclose(file);
 }

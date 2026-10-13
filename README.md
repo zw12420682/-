@@ -1,12 +1,34 @@
-# HotspotAutoOff 1.0.0
+# HotspotAutoOff 1.1.0
 
 Wi-Fi 个人热点开启后，如果连续一段时间**没有任何设备连接**，自动关闭热点。
 
-- 只处理 **Wi-Fi 热点**（系统热点网桥 `bridge0`），暂不处理 USB / 蓝牙共享。
+- 只处理 **Wi-Fi 热点**，暂不处理 USB / 蓝牙共享。
 - 判定「无连接」= 热点网桥上没有任何 ARP 邻居（即没有设备连上），与流量无关。
 - 默认 **5 分钟**，设置里可调 **1–60 分钟**。
-- 每 30 秒检测一次；有设备连上立即清零计时。
+- 自适应轮询：热点关着 **60 秒**一次（只 1 次系统调用），热点开着 **30 秒**一次。
 - 检测不到邻居表时按「未知」处理，**不会**关闭热点（避免误关正在使用的热点）。
+
+## 热点网桥的识别（1.1.0 修正）
+
+热点网桥的**编号不是固定的**：真机日志显示 iOS 16 上叫 **`bridge100`**，而不是常说的
+`bridge0`。旧版本写死 `bridge0`，导致永远检测不到热点、插件从未触发。
+
+现在改为动态识别：**任何持有 IPv4 地址且处于 UP 状态的 `bridge*` 接口**就是热点网桥
+（其地址通常是热点网关 `172.20.10.1`）。ARP 邻居也改为在该网桥上统计。
+
+## 关闭热点的实现（1.1.0 修正）
+
+从真机类清单里找到了系统自己的入口：
+
+| 类 | 关键方法 | 说明 |
+|---|---|---|
+| `WFPersonalHotspotStateMonitor` | `-setMISDiscoveryState:immediateDisable:` | **实际改热点状态的 API**（MIS = MobileInternetSharing） |
+| `CCUIConnectivityHotspotViewController` | `-_toggleState` / `-setPhStateMonitor:` | SpringBoard 控制中心的热点按钮，持有上面那个 monitor |
+
+插件现在**优先**用 `setMISDiscoveryState:NO immediateDisable:YES` 关闭（并 hook `-init` 与
+`-setPhStateMonitor:` 来复用系统已创建的 monitor 实例）。只有这条路径不可用时，才退回
+旧的兜底链：类探测 → SCPreferences → Darwin 通知 → MobileWiFi SoftAP（SoftAP 放最后，
+因为它只停 Wi-Fi 层的 AP、不同步守护进程状态，可能留下「功能已停但开关还显示开」）。
 
 ## 安装与开关
 
@@ -16,8 +38,9 @@ Wi-Fi 个人热点开启后，如果连续一段时间**没有任何设备连接
 |---|---|---|
 | 启用 | 开 | 总开关 |
 | 无连接多久后关闭（分钟） | 5 | 1–60 |
-| 只记录不关闭 | 关 | **首次请先打开**：达到时间只写日志、不真正关闭热点 |
-| 立即检测一次 | — | 立刻跑一次判定，用于调试 |
+| 只记录不关闭 | 关 | **建议先打开**：达到时间只写日志、不真正关闭热点 |
+| 立即检测一次 | — | 立刻跑一次判定 |
+| 导出诊断信息 | — | 把网卡/偏好/进程/相关类转储到日志 |
 
 ## 日志
 
@@ -25,36 +48,26 @@ Wi-Fi 个人热点开启后，如果连续一段时间**没有任何设备连接
 /var/tmp/hotspot-autooff.log
 ```
 
-（依次尝试 `/var/tmp/`、`/var/mobile/Library/Logs/`、临时目录，取第一个可写的。）
+（依次尝试 `/var/tmp/`、`/var/mobile/Library/Logs/`、临时目录，**只写第一个可写的**。）
 
-典型内容：
+正常一轮的样子：
 
 ```
 install: loaded into SpringBoard
-monitor: started (poll 30s)
-state: hotspot on
+monitor: started (poll 30s active / 60s dormant)
+state: hotspot on (bridge100)
 idle: started, no client connected
-idle: 30s / 300s
 idle: reset (1 client(s) connected)
+idle: started, no client connected
 action: closing hotspot after 301s idle
 turnoff: starting candidate chain
-turnoff/softap: set SoftAP=NO accepted=0
-turnoff/prefs: set=1 commit=1 apply=1
-turnoff: chain finished submitted=1
+turnoff/monitor: hooked monitor=WFPersonalHotspotStateMonitor controller=CCUIConnectivityHotspotViewController
+turnoff/monitor: setMISDiscoveryState=NO immediateDisable=YES sent
+turnoff: chain finished via state monitor
+state: hotspot off
 ```
 
-## 重要：关闭热点这一步需要真机确认
-
-`bridge0` 检测和 ARP 统计用的是标准 BSD 接口，可靠性高；但**「关闭热点」是私有机制**，
-不同 iOS 版本/机型可能不同。所以插件按顺序尝试多条路径，并把每一条的结果写进日志：
-
-1. 进程内共享控制类探测（`MISManager` / `MobileInternetSharing` / `SharingManager` …）；
-2. `MobileWiFi.framework` 的 `WiFiDeviceClientSetProperty(SoftAP, false)`；
-3. `SCPreferences` 写 `com.apple.MobileInternetSharing` 域并 commit/apply；
-4. 发送对应的 Darwin 通知。
-
-**请先打开「只记录不关闭」跑一次**，把 `hotspot-autooff.log` 发回来，我根据日志里哪一条
-`accepted/set/commit/apply` 为 1，把这套「霰弹式」尝试收敛成唯一有效路径。
+`state: hotspot off` 就是成功标志：网桥消失了。
 
 ## 构建
 
@@ -64,8 +77,8 @@ turnoff: chain finished submitted=1
 
 ## 真机验证清单
 
-1. 装好后开热点 → 日志出现 `state: hotspot on`；关热点 → `state: hotspot off`。
-2. 打开「只记录不关闭」，热点开 5 分钟无人连 → 日志出现 `idle: started` 与 `action: dry run`。
-3. 连一台设备 → 日志出现 `idle: reset (1 client(s) connected)`。
-4. 设备断开 → 5 分钟后出现 `action: closing hotspot`。
-5. 关掉「只记录不关闭」再重复第 4 步，确认热点真的被关闭。
+1. 开热点 → 日志出现 `state: hotspot on (bridge100)`；关热点 → `state: hotspot off`。
+2. 连一台设备 → `idle: reset (1 client(s) connected)`。
+3. 设备断开 → 到点出现 `action: closing hotspot` 与 `turnoff/monitor: ...`。
+4. 紧跟着应出现 `state: hotspot off`，且**设置里的开关自己变成关**。
+5. 若开关没变，把日志里 `turnoff/...` 那几行发回，据此再收敛。

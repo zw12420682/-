@@ -1,6 +1,6 @@
 Package: local.hotspotautooff
 Name: HotspotAutoOff (热点无连接自动关闭)
-Version: 1.0.1
+Version: 1.1.0
 Architecture: iphoneos-arm64e
 Description: Closes the Wi-Fi Personal Hotspot after a configurable idle period with no client connected.
 Maintainer: HotspotAutoOff

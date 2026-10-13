@@ -76,7 +76,7 @@ static const NSTimeInterval HAOPollIntervalDormant = 60.0;
     }
     if (!self.wasActive) {
         self.wasActive = YES;
-        HAOLog(@"state: hotspot on");
+        HAOLog(@"state: hotspot on (%@)", HAOHotspotActiveBridge() ?: @"?");
     }
     NSInteger clients = HAOHotspotClientCount();
     if (clients < 0) {

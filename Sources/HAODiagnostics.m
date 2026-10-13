@@ -164,7 +164,8 @@ static void HAODumpProcesses(void) {
 
 void HAODumpDiagnostics(void) {
     HAOLog(@"diag: ===== begin =====");
-    HAOLog(@"diag: hotspotActive=%d clientCount=%ld", HAOHotspotIsActive(), (long)HAOHotspotClientCount());
+    HAOLog(@"diag: hotspotActive=%d bridge=%@ clientCount=%ld",
+           HAOHotspotIsActive(), HAOHotspotActiveBridge() ?: @"(none)", (long)HAOHotspotClientCount());
     HAODumpInterfaces();
     HAODumpSharingPreferences();
     HAODumpProcesses();

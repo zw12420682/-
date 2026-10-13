@@ -60,29 +60,36 @@ struct rt_msghdr {
 };
 #endif
 
-NSString * const HAOHotspotInterface = @"bridge0";
-
 // sockaddr entries inside a routing message are padded to 4-byte boundaries.
 #define HAO_ROUND4(n) (((n) > 0) ? (1 + (((n) - 1) | 3)) : 4)
 
-BOOL HAOHotspotIsActive(void) {
-    const char *name = HAOHotspotInterface.UTF8String;
-    if (if_nametoindex(name) == 0) return NO;
+NSString *HAOHotspotActiveBridge(void) {
     struct ifaddrs *list = NULL;
-    if (getifaddrs(&list) != 0 || list == NULL) return NO;
-    BOOL active = NO;
+    if (getifaddrs(&list) != 0 || list == NULL) return nil;
+    NSString *bridge = nil;
     for (struct ifaddrs *cur = list; cur; cur = cur->ifa_next) {
-        if (!cur->ifa_name || strcmp(cur->ifa_name, name) != 0) continue;
-        if (!cur->ifa_addr || cur->ifa_addr->sa_family != AF_INET) continue;
+        if (!cur->ifa_name || !cur->ifa_addr) continue;
+        if (cur->ifa_addr->sa_family != AF_INET) continue;
         if ((cur->ifa_flags & IFF_UP) == 0) continue;
-        active = YES;
+        // The hotspot bridge is the only bridge* interface holding an IPv4 address
+        // (the hotspot gateway, typically 172.20.10.1). Its index varies by build:
+        // iOS 16 uses bridge100, so nothing may be hard-coded.
+        NSString *name = @(cur->ifa_name);
+        if (![name hasPrefix:@"bridge"]) continue;
+        bridge = name;
         break;
     }
     freeifaddrs(list);
-    return active;
+    return bridge;
+}
+
+BOOL HAOHotspotIsActive(void) {
+    return HAOHotspotActiveBridge() != nil;
 }
 
 NSInteger HAOHotspotClientCount(void) {
+    NSString *bridge = HAOHotspotActiveBridge();
+    if (bridge.length == 0) return -1;
     int mib[6] = { CTL_NET, PF_ROUTE, 0, AF_INET, NET_RT_FLAGS, RTF_LLINFO };
     size_t needed = 0;
     if (sysctl(mib, 6, NULL, &needed, NULL, 0) != 0 || needed == 0) {
@@ -97,8 +104,8 @@ NSInteger HAOHotspotClientCount(void) {
         return -1;
     }
     NSInteger count = 0;
-    const size_t nameLength = strlen(HAOHotspotInterface.UTF8String);
-    const char *name = HAOHotspotInterface.UTF8String;
+    const char *name = bridge.UTF8String;
+    const size_t nameLength = strlen(name);
     char *limit = buffer + needed;
     for (char *cursor = buffer; cursor + sizeof(struct rt_msghdr) <= limit; ) {
         struct rt_msghdr *rtm = (struct rt_msghdr *)cursor;

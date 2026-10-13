@@ -1,14 +1,15 @@
 #pragma once
 #import <Foundation/Foundation.h>
 
-// YES while the Wi-Fi Personal Hotspot is up (the system bridge interface exists,
-// is running and holds an IPv4 address).
+// Name of the bridge interface that carries the Wi-Fi hotspot, or nil when no
+// hotspot bridge is present. The index is NOT fixed (iOS 16 uses bridge100, not
+// bridge0), so it is discovered from the live interface list.
+NSString *HAOHotspotActiveBridge(void);
+
+// YES while a hotspot bridge is up with an IPv4 address.
 BOOL HAOHotspotIsActive(void);
 
-// Number of clients currently attached to the hotspot, taken from the ARP table
-// of the hotspot bridge. Returns -1 when the table cannot be read; callers must
-// treat -1 as "unknown" and never close the hotspot on an unknown count.
+// Number of clients attached to the hotspot, from the ARP table of the hotspot
+// bridge. Returns -1 when the count cannot be determined; callers must treat -1
+// as "unknown" and never close the hotspot then.
 NSInteger HAOHotspotClientCount(void);
-
-// Interface name used by the Wi-Fi hotspot bridge (exposed for logging/tests).
-extern NSString * const HAOHotspotInterface;
