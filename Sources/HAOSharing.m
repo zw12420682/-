@@ -44,7 +44,9 @@ static void HAOInstallMonitorHooks(void) {
         MSHookMessageEx(controllerClass, NSSelectorFromString(@"setPhStateMonitor:"),
                         (IMP)&HAOSetPhStateMonitor, (IMP *)&HAOOriginalSetPhStateMonitor);
     installed = YES;
-    HAOLog(@"turnoff/monitor: hooked monitor=%@ controller=%@", monitorClass ?: @"-", controllerClass ?: @"-");
+    HAOLog(@"turnoff/monitor: hooked monitor=%@ controller=%@",
+           monitorClass ? NSStringFromClass(monitorClass) : @"-",
+           controllerClass ? NSStringFromClass(controllerClass) : @"-");
 }
 
 static id HAOStateMonitor(void) {

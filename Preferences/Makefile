@@ -2,7 +2,7 @@ include $(THEOS)/makefiles/common.mk
 
 BUNDLE_NAME = HotspotAutoOffPrefs
 HotspotAutoOffPrefs_FILES = HAOPreferences.m
-HotspotAutoOffPrefs_CFLAGS = -fobjc-arc -Wall -Wextra
+HotspotAutoOffPrefs_CFLAGS = -fobjc-arc -Wall -Wextra -Wno-error
 HotspotAutoOffPrefs_FRAMEWORKS = UIKit Foundation
 HotspotAutoOffPrefs_PRIVATE_FRAMEWORKS = Preferences
 HotspotAutoOffPrefs_INSTALL_PATH = /Library/PreferenceBundles

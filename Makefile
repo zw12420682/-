@@ -7,7 +7,7 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = HotspotAutoOff
 HotspotAutoOff_FILES = Sources/Tweak.m Sources/HAOController.m Sources/HAODiagnostics.m Sources/HAOHotspot.m Sources/HAOPreferences.m Sources/HAOSharing.m
-HotspotAutoOff_CFLAGS = -fobjc-arc -Wall -Wextra
+HotspotAutoOff_CFLAGS = -fobjc-arc -Wall -Wextra -Wno-error
 HotspotAutoOff_FRAMEWORKS = Foundation SystemConfiguration
 HotspotAutoOff_LIBRARIES = substrate
 
